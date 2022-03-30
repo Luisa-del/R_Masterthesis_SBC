@@ -1,0 +1,734 @@
+---
+title: "RandomForest Landcover classification"
+author: "Luisa Pflumm"
+date: "25 3 2022"
+output: html_document
+---
+
+<!-- Sources:  -->
+<!-- https://valentinitnelav.github.io/satellite-image-classification-r/#fit_models -->
+<!-- https://rspatial.org/raster/rs/5-supclassification.html#reference-data -->
+<!-- https://rpubs.com/ials2un/rf_landcover -->
+<!-- https://blogs.fu-berlin.de/reseda/classification-in-r/ -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Setup
+
+```{r libraries, include=FALSE}
+# Packages for spatial data processing & visualization
+library(rgdal)
+library(gdalUtils)
+library(raster)
+library(sf)
+library(sp)
+library(terra)
+library(RStoolbox)
+#library(getSpatialData)
+library(rasterVis)
+library(mapview)
+library(grid)
+
+library(RColorBrewer)
+library(plotly)
+library(grDevices)
+
+# Machine learning packages
+library(caret)
+library(randomForest)
+library(ranger)
+library(MLmetrics)
+library(nnet)
+library(NeuralNetTools)
+library(LiblineaR)
+
+# Packages for general data processing and parallel computation
+library(data.table)
+library(dplyr)
+library(stringr)
+library(doParallel)
+library(snow)
+library(parallel)
+
+# set the temporary folder for raster package operations
+rasterOptions(tmpdir = "./cache/temp")
+```
+
+# Data preparation
+
+## Raster data 
+
+Import multiband raster
+
+```{r}
+# Import raster layer
+ls <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/L8_reducers_2021_months_8-12.tif")
+```
+
+Select bands (predictors)
+
+```{r}
+# # Subset to specific columns
+# bands <- c("B_median","G_median","R_median","NIR_median","SWIR1_median","SWIR2_median","BSI_median","NDVI_median","NDMI_median")
+# landsat <- subset(ls, bands)
+
+# OR: remove only valid_pixel column
+landsat <- ls[[-length(names(ls))]]
+
+names(landsat)
+```
+
+## Training polygons
+
+Import training polygons
+
+```{r}
+# Import dataset
+samp <- shapefile("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/trainingdata/Nuichua/LC_classes_tejas.shp")
+
+# Need to have a numeric id for each class - helps with rasterization later on.
+samp@data$class_id <- as.integer(factor(samp@data$class_id))
+samp@data$plot_id <- as.integer(factor(samp@data$plot_id))
+samp@data$binary_id <- as.integer(factor(samp@data$binary_id))
+
+# Set as data table
+setDT(samp@data)
+```
+
+Define class parameters
+
+```{r}
+# set class names
+classes <- c("Evergreen.Forest","Dry.Forest","Costal.Shrubland","Inland.Shrubland",
+  "Bare.Ground","Agriculture","Water","Built.up")
+# define color palette
+cpal <- c("#162700","#a1a733","#5fa00a","#37590a","#f86b05","#c22341","#0500ff","#020103")
+# save class definitions in df
+classdf <- data.frame(classvalue = c(1,2,3,4,5,6,7,8),
+                      classnames = classes,
+                      color = cpal)
+```
+
+*--> Raster and vector data have same CRS? If not, reproject training data.*
+
+Plot training data
+
+```{r}
+mapview(samp, zcol = "landcover", layer.name = "Tejas landcover classes",
+        col.regions = list("#c22341","#f86b05","#020103","#5fa00a","#a1a733","#162700","#37590a","#0500ff"))
+```
+
+<!-- ### Import training (70%) and validation (30%) samples from GEE -->
+
+<!-- ```{r} -->
+<!-- # import csv files -->
+<!-- train <- read.csv("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/training_points_tejas_split_70.csv") -->
+<!-- test <- read.csv("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/valid_points_tejas_split_30.csv") -->
+
+<!-- # create sf object with geometry -->
+<!-- library(geojsonsf) -->
+<!-- train <- st_as_sf(data.frame(train, geom=geojson_sf(train$.geo))) -->
+<!-- test <- st_as_sf(data.frame(test, geom=geojson_sf(test$.geo))) -->
+
+<!-- # remove columns of no interest -->
+<!-- remove.columns <- c("system.index","random",".geo") -->
+<!-- train <- train[, !(names(train) %in% remove.columns)] -->
+<!-- test <- test[, !(names(test) %in% remove.columns)] -->
+
+<!-- # select required columns -->
+<!-- median_t <- select(train, contains("median")) -->
+<!-- median_v <- select(test, contains("median")) -->
+<!-- train <- cbind(median_t, train$class_id) -->
+<!-- names(train)[names(train) == 'train.class_id'] <- 'class_id' -->
+<!-- test <- cbind(median_v, test$class_id) -->
+<!-- names(test)[names(test) == 'test.class_id'] <- 'class_id' -->
+
+<!-- # factor -->
+<!-- train <- st_drop_geometry(train) -->
+<!-- train[,"class_id"] <- factor(train[,"class_id"]) -->
+
+<!-- levels(train$class_id) <- classes -->
+
+<!-- # factor -->
+<!-- test <- st_drop_geometry(test) -->
+<!-- test[,"class_id"] <- factor(test[,"class_id"]) -->
+
+<!-- levels(test$class_id) <- classes -->
+
+<!-- # number of poits per class -->
+<!-- table(train$class_id) -->
+<!-- table(test$class_id) -->
+
+<!-- ``` -->
+
+<!-- Histograms of imported predictors -->
+
+<!-- ```{r} -->
+<!-- train %>%  -->
+<!--   select(-c("class_id")) %>% -->
+<!--   melt(measure.vars = names(.)) %>%  -->
+<!--   ggplot() + -->
+<!--   geom_histogram(aes(value)) + -->
+<!--   geom_vline(xintercept = 0, color = "gray70") + -->
+<!--   ggtitle("TRAINING") + -->
+<!--   facet_wrap(facets = vars(variable), ncol = 3) -->
+
+<!-- test %>%  -->
+<!--   select(-c("class_id")) %>% -->
+<!--   melt(measure.vars = names(.)) %>%  -->
+<!--   ggplot() + -->
+<!--   geom_histogram(aes(value)) + -->
+<!--   geom_vline(xintercept = 0, color = "gray70") + -->
+<!--   ggtitle("VALIDATION") + -->
+<!--   facet_wrap(facets = vars(variable), ncol = 3) -->
+<!-- ``` -->
+
+### Create training samples in R
+
+#### Extract all band values
+
+Rasterize training polygons
+
+```{r}
+# Create raster template
+template_rst <- raster(extent(landsat$B_median), # band B2 has resolution 10 m
+                       resolution = 30,
+                       crs = projection(landsat$B_median))
+#samp_rst <- raster::rasterize(samp, template_rst, field = "class_id") #-> not working, don't know why :(
+samp_rst <- raster("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/LC_tejas_rasterized.tif") # import sample raster created in QGIS
+```
+
+Create spatial points from cells in training polygons
+
+```{r}
+samp_dt <- as.data.table(rasterToPoints(samp_rst))
+setnames(samp_dt, old = "LC_tejas_rasterized", new = "class_id")
+
+points <- SpatialPointsDataFrame(coords = samp_dt[, .(x, y)],
+                                 data = samp_dt,
+                                 proj4string = samp_rst@crs)
+
+mapview(points,zcol="class_id",layer.name="Point class ids")
+```
+
+Extract bandinfos from landsat scene at points
+
+<!-- # alternativ: data.table syntax -->
+<!-- dt <- terra::rast(landsat) %>% -->
+<!--   terra::extract(y = vect(points)) %>% -->
+<!--   as.data.table %>% -->
+<!--   .[, class_id := points@data$class_id] # %>%  # add the class names to each row -->
+<!--   # merge(y = unique(samp@data), by.x = "class_id", by.y = "ID", all = TRUE, sort = FALSE) %>% -->
+<!--   # .[, class_id := NULL] %>% # this column is extra now, delete it -->
+<!--   # .[, class := factor(class)] -->
+
+```{r}
+# dplyr syntax
+dt <- terra::rast(landsat) %>%
+  terra::extract(y = terra::vect(points)) %>%
+  as.data.frame %>%
+  mutate(class_id = points@data$class_id) %>% # add the class names to each row
+  # left_join(y = unique(poly@data), by = c("class_id" = "id")) %>%
+  # mutate(class_id = NULL) %>% # this column is extra now, delete it
+  mutate(class_id = factor(class_id))
+data.table::setDT(dt)
+
+# Add landcover labels
+dt <- dt %>%
+  mutate(landcover = case_when(
+    class_id == 1 ~ "Evergreen",
+    class_id == 2 ~ "Dry Forest",
+    class_id == 3 ~ "Coastal Shrubland",
+    class_id == 4 ~ "Inland Shrubland",
+    class_id == 5 ~ "Bare Ground",
+    class_id == 6 ~ "Agriculture",
+    class_id == 7 ~ "Water",
+    class_id == 8 ~ "Built-up")) %>%
+  mutate(landcover = factor(landcover))
+
+# View the first 6 rows
+head(dt)
+```
+
+Histograms of predictors
+
+```{r}
+dt %>%
+  select(-c("class_id","ID","landcover")) %>%
+  select(ends_with("median")) %>%
+  melt(measure.vars = names(.)) %>%
+  ggplot() +
+  geom_histogram(aes(value)) +
+  geom_vline(xintercept = 0, color = "gray70") +
+  facet_wrap(facets = vars(variable), ncol = 4)
+
+dt %>%
+  select(-c("class_id","ID","landcover")) %>%
+  select(ends_with("mean")) %>%
+  melt(measure.vars = names(.)) %>%
+  ggplot() +
+  geom_histogram(aes(value)) +
+  geom_vline(xintercept = 0, color = "gray70") +
+  facet_wrap(facets = vars(variable), ncol = 4)
+
+dt %>%
+  select(-c("class_id","ID","landcover")) %>%
+  select(ends_with("stdDev")) %>%
+  melt(measure.vars = names(.)) %>%
+  ggplot() +
+  geom_histogram(aes(value)) +
+  geom_vline(xintercept = 0, color = "gray70") +
+  facet_wrap(facets = vars(variable), ncol = 4)
+```
+
+<!-- #### Option 2: Extract only from sample points -->
+
+<!-- Generate random points -->
+
+<!-- ```{r} -->
+<!-- set.seed(1) -->
+<!-- # generate point samples from the polygons -->
+<!-- ptsamp <- spsample(samp, 100000, type='random') -->
+<!-- # add the land cover class to the points -->
+<!-- ptsamp$class <- over(ptsamp, samp)$landcover -->
+<!-- mapview(ptsamp) -->
+<!-- # We convert `ptsamp` to `SpatVector` -->
+<!-- ptsamp <- vect(ptsamp) -->
+<!-- ``` -->
+
+<!-- Extract spectral values for the random points -->
+
+<!-- ```{r} -->
+<!-- # We use the x-y coordinates to extract the spectral values for the locations -->
+<!-- xy <- as.matrix(geom(ptsamp)[,c('x','y')]) -->
+<!-- df <- raster::extract(landsat, xy) #/ 10000 -->
+<!-- # Quick check for the extracted values -->
+<!-- head(df) -->
+<!-- plot(df) -->
+<!-- ## EXAMPLE: blue      green        red        NIR       SWIR1       SWIR2 -->
+<!-- ## [1,] 0.08874092 0.08284220 0.04697283 0.58581585 0.160154358 0.062934048 -->
+<!-- ## [2,] 0.12354765 0.10734788 0.11112132 0.15150148 0.265940815 0.259304762 -->
+<!-- ## [3,] 0.12255007 0.09973594 0.08147595 0.06469065 0.048490878 0.039642811 -->
+<!-- ## [4,] 0.09806608 0.08240847 0.05738232 0.02190330 0.008826377 0.006137258 -->
+<!-- ## [5,] 0.12263682 0.11101288 0.11441766 0.16561934 0.252061486 0.229941323 -->
+<!-- ## [6,] 0.14146066 0.16711570 0.24176043 0.41041589 0.366023749 0.193529800 -->
+
+<!-- # combine lulc class information with extracted values -->
+<!-- sampdata <- data.frame(class = ptsamp$class, df) -->
+<!-- ``` -->
+
+#### Split into train and test data
+
+```{r}
+set.seed(321)
+# A stratified random split of the data
+idx_train <- createDataPartition(dt$class_id,
+                                 p = 0.7, # percentage of data as training
+                                 list = FALSE)
+train <- dt[idx_train]
+test <- dt[-idx_train]
+
+train <- train %>% select(-c("ID","landcover"))
+levels(train$class_id) <- classes
+
+test <- test %>% select(-c("ID","landcover"))
+levels(test$class_id) <- classes
+
+table(train$class_id)
+table(test$class_id)
+```
+
+# Classification
+
+## Random Forest
+
+### Fit model
+
+Create cross-validation folds (splits the data into n random groups)
+
+```{r}
+n_folds <- 10
+set.seed(321)
+folds <- createFolds(1:nrow(train), k = n_folds)
+# Set the seed at each resampling iteration. Useful when running CV in parallel.
+seeds <- vector(mode = "list", length = n_folds + 1) # +1 for the final model
+for(i in 1:n_folds) seeds[[i]] <- sample.int(1000, n_folds)
+seeds[n_folds + 1] <- sample.int(1000, 1) # seed for the final model
+```
+
+Set trainControl parameters
+
+```{r}
+ctrl <- trainControl(summaryFunction = multiClassSummary,
+                     method = "cv",
+                     number = n_folds,
+                     search = "grid",
+                     classProbs = TRUE, # not implemented for SVM; will just get a warning
+                     savePredictions = TRUE,
+                     index = folds,
+                     seeds = seeds)
+```
+
+Train the classifier
+
+```{r}
+# Register a doParallel cluster, using 3/4 (75%) of total CPU-s
+cl <- makeCluster(3/4 * detectCores())
+registerDoParallel(cl)
+model_rf <- caret::train(class_id ~ . , method = "rf", data = train,
+                         importance = TRUE, # passed to randomForest()
+                         # run CV process in parallel;
+                         # see https://stackoverflow.com/a/44774591/5193830
+                         allowParallel = TRUE,
+                         tuneGrid = data.frame(mtry = c(2, 3, 4, 5, 8)),
+                         trControl = ctrl)
+stopCluster(cl); remove(cl)
+# Unregister the doParallel cluster so that we can use sequential operations
+# if needed; details at https://stackoverflow.com/a/25110203/5193830
+registerDoSEQ()
+saveRDS(model_rf, file = "D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/processed/Classification/R/initial_model_rf.rds")
+```
+
+### Model summary & confusion matrix
+
+```{r}
+model_rf$times$everything # total computation time
+```
+
+```{r}
+plot(model_rf, uniform=TRUE, main="Random forest")
+#ggplot(model_rf) # same as above, but using the ggplot method from caret
+```
+
+Confusion matrix
+
+```{r}
+(cm_rf <- confusionMatrix(data = predict(model_rf, newdata = test),
+                         test$class_id))
+```
+
+```{r}
+model_rf$finalModel
+```
+
+### Predictor importance
+
+```{r}
+caret::varImp(model_rf)$importance %>% 
+  as.matrix %>% 
+  plot_ly(x = colnames(.), y = rownames(.), z = ., type = "heatmap",
+          width = 600, height = 600)
+```
+
+
+```{r}
+randomForest::importance(model_rf$finalModel) %>% 
+  .[, - which(colnames(.) %in% c("MeanDecreaseAccuracy", "MeanDecreaseGini"))] %>% 
+  plot_ly(x = colnames(.), y = rownames(.), z = ., type = "heatmap",
+          width = 600, height = 600)
+```
+
+
+
+```{r}
+randomForest::varImpPlot(model_rf$finalModel)
+```
+
+### Visualize
+
+#### Class probabilities
+
+Make prediction
+
+```{r}
+system.time({
+  predict_rf_2 <- raster::predict(object = landsat,
+                                model = model_rf, 
+                                type = 'prob' , index=1:8)
+  # predict_svm <- raster::predict(object = landsat,
+  #                                model = model_svm, type = 'raw')
+  # predict_nnet <- raster::predict(object = landsat,
+  #                                 model = model_nnet, type = 'raw')
+})
+```
+
+Plot class probabilies
+
+```{r}
+#viewRGB(brick(landsat[1:3]), r = 3, g = 2, b = 1) +
+#mapView(predict_rf
+        #,col.regions = list("#c22341","#f86b05","#020103","#5fa00a","#a1a733","#162700","#37590a","#0500ff")
+ #       )
+     # ,
+     # mapView(predict_svm, col.regions = cls_dt$hex),
+     # mapView(predict_nnet, col.regions = cls_dt$hex)
+#plot(predict_rf_2)
+levelplot(predict_rf_2)
+```
+
+**Expand below to see single class probability for each class.**
+<details>
+  <summary> Click here to expand! </summary>
+```{r}
+for (i in 1:length(classdf$classvalue)){
+mycol <- colorRampPalette(c("white", classdf$color[i]))
+print(levelplot(predict_rf_2[[i]], col.regions=mycol, main=classdf$classnames[i]))
+}
+```
+</details>
+
+Combine layers to create final single layer product *(--> same as discrete class layer below)*
+
+```{r}
+# # Option 1 with terra package
+# predict_rf_2_comb <- terra::app(terra::rast(predict_rf_2)#, indices = c(1,2,3,4,5,6,7,8)
+#             , fun = which.max)
+# str(predict_rf_2_comb)
+# #levels(predict_rf_2_comb) <- as.character(classdf$classnames)
+# levelplot(predict_rf_2_comb)
+
+# Option 2 with raster package
+which.max2 <- function(x, ...) which.max(x)           # helper function to absorb "na.rm"
+predict_rf_2_comb <-  stackApply(predict_rf_2, rep(1,8), fun=which.max2, na.rm=NULL)
+
+#predict_rf_2_comb <- as.factor(predict_rf_2_comb)
+#levels(predict_rf_2_comb) <- as.character(classdf$classnames)
+
+#predict_rf_2_comb@data@names <- c("1 = Evergreen Forest \n2 = Dry Forest \n3 = Coastal Shrubland \n4 = Inland Shrubland \n5 = Bare Ground \n6 = Agriculture \n7 = Water \n8 = Built-up")
+
+#plot.new()  # open new plot
+levelplot(predict_rf_2_comb, main = "Class probabilities") 
+#+ layer(panel.text(predict_rf_2_comb@extent@xmin, predict_rf_2_comb@extent@ymin, text2add))
+#mtext("1 = Evergreen Forest \n2 = Dry Forest \n3 = Coastal Shrubland \n4 = Inland Shrubland \n5 = Bare Ground \n6 = Agriculture \n7 = Water \n8 = Built-up", 1, line=0, adj=0, cex = 0.7)
+
+class_df <- classdf[1:2]
+data.table(class_df)
+
+```
+
+#### Discrete classes
+
+Make prediction
+
+```{r}
+system.time({
+  predict_rf <- raster::predict(object = landsat,
+                                model = model_rf, 
+                                type = 'raw')
+  # predict_svm <- raster::predict(object = landsat,
+  #                                model = model_svm, type = 'raw')
+  # predict_nnet <- raster::predict(object = landsat,
+  #                                 model = model_nnet, type = 'raw')
+})
+```
+
+Plot classes  *(--> same as combined probability layer above)*
+
+```{r}
+#plot
+levelplot(predict_rf,col.regions=cpal,att='value')
+```
+
+
+# Export
+
+```{r}
+# # Export probability rasters for each class
+# for (i in 1:length(predict_rf_2)){
+#   raster::writeRaster(predict_rf_2[[i]], paste0( "D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/rf_",i,"class_prob.tif"))
+# }
+# 
+# # Export combined/single raster classification
+# raster::writeRaster(predict_rf_2_comb, "D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/rf_prob_comb.tif")
+# raster::writeRaster(predict_rf, "D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/rf_classes.tif")
+```
+
+```{r}
+
+```
+
+
+
+<!-- ### CART -->
+<!-- #### Train the classifier -->
+
+<!-- ```{r} -->
+<!-- library(rpart) -->
+<!-- # Train the model -->
+<!-- cartmodel <- rpart(class_id~., data = train, method = 'class', minsplit = 8) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- # print trained model -->
+<!-- print(cartmodel) -->
+<!-- ## n= 1000 -->
+<!-- ## -->
+<!-- ## node), split, n, loss, yval, (yprob) -->
+<!-- ##       * denotes terminal node -->
+<!-- ## -->
+<!-- ##  1) root 1000 612 water (0.07 0.099 0.16 0.28 0.39) -->
+<!-- ##    2) NIR>=0.08310244 612 328 open (0.11 0.16 0.26 0.46 0) -->
+<!-- ##      4) SWIR1< 0.2725443 303 159 fallow (0.19 0.33 0.48 0.0066 0) -->
+<!-- ##        8) SWIR2< 0.1270392 100   1 cropland (0.01 0.99 0 0 0) * -->
+<!-- ##        9) SWIR2>=0.1270392 203  59 fallow (0.28 0 0.71 0.0099 0) -->
+<!-- ##         18) blue>=0.1296632 58   1 built (0.98 0 0 0.017 0) * -->
+<!-- ##         19) blue< 0.1296632 145   1 fallow (0 0 0.99 0.0069 0) * -->
+<!-- ##      5) SWIR1>=0.2725443 309  27 open (0.039 0 0.049 0.91 0) * -->
+<!-- ##    3) NIR< 0.08310244 388   0 water (0 0 0 0 1) * -->
+<!-- # Plot the trained classification tree -->
+<!-- plot(cartmodel, uniform=TRUE, main="Classification Tree") -->
+<!-- text(cartmodel, cex = 1) -->
+<!-- ``` -->
+
+<!-- #### Classify -->
+
+<!-- ```{r} -->
+<!-- # Now predict the subset data based on the model; prediction for entire area takes longer time -->
+<!-- classified <- predict(landsat, cartmodel, na.rm = TRUE) -->
+<!-- classified -->
+<!-- ## class       : SpatRaster -->
+<!-- ## dimensions  : 1245, 1497, 5  (nrow, ncol, nlyr) -->
+<!-- ## resolution  : 30, 30  (x, y) -->
+<!-- ## extent      : 594090, 639000, 4190190, 4227540  (xmin, xmax, ymin, ymax) -->
+<!-- ## coord. ref. : +proj=utm +zone=10 +datum=WGS84 +units=m +no_defs -->
+<!-- ## data source : memory -->
+<!-- ## names       :     built,  cropland,    fallow,      open,     water -->
+<!-- ## min values  :         0,         0,         0,         0,         0 -->
+<!-- ## max values  : 0.9827586, 0.9900000, 0.9931034, 0.9126214, 1.0000000 -->
+<!-- plot(classified)  -->
+<!-- ``` -->
+<!-- *each of the layer represents the probability of particular LULC class* -->
+
+<!-- Combine layers to create final single layer product -->
+
+<!-- ```{r} -->
+<!-- class <- c("Agriculture","Bare.Ground","Built.up","Costal.Shrubland","Dry.Forest","Evergreen.Forest","Inland.Shrubland","Water") -->
+<!-- #mycolor <- c("#162700","#a1a733","#5fa00a","#37590a","#f86b05","#c22341","#0500ff","#020103") -->
+<!-- mycolor <- c("red","cyan","green","darkgreen","blue","darkblue","grey","orange") -->
+<!-- classdf <- data.frame(classvalue = c(1,2,3,4,5,6,7,8), -->
+<!--                       classnames = class, -->
+<!--                       color = mycolor) -->
+<!-- lulc <- terra::app(classified, fun = which.max) -->
+
+<!-- lulcc <- as.factor(lulc) -->
+<!-- levels(lulcc) <- as.character(classdf$classnames) -->
+
+
+<!-- x <- classified[classified] -->
+<!-- y <- lulc[lulc] -->
+<!-- ``` -->
+
+<!-- #### Model Evaluation -->
+
+<!-- use k-fold cross-validation (5 groups) -->
+
+<!-- ```{r} -->
+<!-- set.seed(99) -->
+<!-- # number of folds -->
+<!-- k <- 5 -->
+<!-- j <- sample(rep(1:k, each = round(nrow(sampdata))/k)) -->
+<!-- # or using `dismo` library to get equal number of samples -->
+<!-- # library(dismo) -->
+<!-- # j <- kfold(sampdata, k = 5, by=sampdata$classvalue) -->
+<!-- table(j) -->
+<!-- ## j -->
+<!-- ##   1   2   3   4   5 -->
+<!-- ## 200 200 200 200 200 -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- x <- list() -->
+<!-- for (k in 1:8) { -->
+<!--     train <- sampdata[j!= k, ] -->
+<!--     test <- sampdata[j == k, ] -->
+<!--     cart <- rpart(as.factor(class)~., data=train, method = 'class', -->
+<!--                   minsplit = 8) -->
+<!--     pclass <- predict(cart, test, na.rm = TRUE) -->
+<!--     # assign class to maximum probablity -->
+<!--     pclass <- apply(pclass, 1, which.max) -->
+<!--     # create a data.frame using the reference and prediction -->
+<!--     x[[k]] <- cbind(test$class, as.integer(pclass)) -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- y <- do.call(rbind, x) -->
+<!-- y <- data.frame(y) -->
+<!-- colnames(y) <- c('observed', 'predicted') -->
+<!-- # confusion matrix -->
+<!-- conmat <- table(y) -->
+<!-- conmat -->
+<!-- # change the name of the classes -->
+<!-- colnames(conmat) <- classdf$classnames -->
+<!-- rownames(conmat) <- classdf$classnames -->
+<!-- print(conmat) -->
+<!-- ##           predicted -->
+<!-- ## observed   built cropland fallow open water -->
+<!-- ##   built       56        1      1   12     0 -->
+<!-- ##   cropland     0       98      1    0     0 -->
+<!-- ##   fallow       0        1    143   15     0 -->
+<!-- ##   open         1        0      2  281     0 -->
+<!-- ##   water        0        0      0    0   388 -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ``` -->
