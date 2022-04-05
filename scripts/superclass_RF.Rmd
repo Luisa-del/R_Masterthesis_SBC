@@ -78,7 +78,7 @@ Import multiband raster
 # #ls <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/L8_reducers_2021_months_5-8.tif")
 ls <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/L8_reducers_2021_months_8-12.tif")
 #ls <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/L8_reducers_2021_months_9-1.tif")
-#ls <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Landsat/L8_reducer_2021_months_1-12_nuichua/L8_reducers_2021_months_1-12_nuichua.tif")
+ls_year <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Landsat/L8_reducer_2021_months_1-12_nuichua/L8_reducers_2021_months_1-12_nuichua.tif")
 
 x <- ls$B_median@file@name
 
@@ -90,17 +90,26 @@ x <- ls$B_median@file@name
 Select bands (predictors)
 
 ```{r}
-landsat <- ls[[-length(names(ls))]]
+# Subset seasonal median ls image to specific columns
+bands <- c("B_median","G_median","R_median","NIR_median","SWIR1_median","SWIR2_median","BSI_median","NDVI_median","EVI2_median", "NDMI_median", "NBR_median","NDWI_median")
+landsat <- subset(ls, bands)
+
+# Subset yearly stdDev
+stddev <- c("B_stdDev","G_stdDev","R_stdDev","NIR_stdDev","SWIR1_stdDev","SWIR2_stdDev","BSI_stdDev","NDVI_stdDev","EVI2_stdDev", "NDMI_stdDev", "NBR_stdDev","NDWI_stdDev")
+year_stddev <- subset(ls_year, stddev)
+
+landsat <- raster::stack(landsat,year_stddev)
 names(landsat)
+
 ```
 Plot falsecolor median image
 
 ```{r, message=FALSE, warning=FALSE}
-r <- landsat[[c(1,4,7,10,13,16)]]
+r <- landsat[[c(1,2,3,4,5)]]
 viewRGB(r, r=5, g=4, b=2, layer.name=x)
 ```
 
-Plot valid pixels of scene
+Plot valid pixels of seasonal scene
 
 ```{r, message=FALSE, warning=FALSE}
 v <- ls[["valid_pixels"]]
@@ -302,9 +311,9 @@ Set parameters and run superClass() from RStoolbox
 #                   #filename = paste0("D:/Dateien/Dropbox (ScreenForBio)/Projects/SBC/SBC_analysis_Nui_Chua/Initial_LC_Luisa/Nuichua/SC_prob_",x,".tif"),
 #                   verbose = TRUE)
 #                   #overwrite = TRUE)
-# save(SC_prob, file = paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_",x,".RData"))
+# save(SC_prob, file = paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_",x,"_year_stddev.RData"))
 
-load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_L8_reducers_2021_months_5-7.RData")
+load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_L8_reducers_2021_months_8-12_year_stddev.RData")
 ```
 
 ## Multiband probability layer
@@ -397,18 +406,17 @@ SC_prob$modelFit
 # SC_prob$classMapping
 ```
 
+<!-- ### Export -->
 
-# Export
-
-```{r}
-# exp1 <- terra::rast(prob_stack)
-# writeRaster(exp1,paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_",x,".tif"))
-# 
-# exp2 <- terra::rast(raw)
-# writeRaster(exp2,paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_raw_",x,".tif"))
-# 
-# #save.image(file="D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_L8_2021_months_1-4_wholeworkspace.RData")
-```
+<!-- ```{r} -->
+<!-- # exp1 <- terra::rast(prob_stack) -->
+<!-- # writeRaster(exp1,paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_",x,"_year_stddev.tif")) -->
+<!-- #  -->
+<!-- # exp2 <- terra::rast(raw) -->
+<!-- # writeRaster(exp2,paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_raw_",x,"_year_stddev.tif")) -->
+<!-- #  -->
+<!-- # #save.image(file="D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_L8_2021_months_1-4_wholeworkspace.RData") -->
+<!-- ``` -->
 
 
 
