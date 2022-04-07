@@ -419,8 +419,6 @@ SC_prob$modelFit
 #
 # exp2 <- terra::rast(raw)
 # writeRaster(exp2,paste0("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_raw_",x,"_year_stddev.tif"))
-#
-# #save.image(file="D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/SC_prob_L8_2021_months_1-4_wholeworkspace.RData")
 ```
 
 ## Visualize extraced band values
@@ -478,7 +476,7 @@ dt <- dt1 %>%
   mutate(landcover = factor(landcover))
 
 # View the first 6 rows
-head(dt)
+#head(dt)
 ```
 
 ### Histograms of predictors
@@ -613,11 +611,63 @@ Violin plots
 
 ```{r}
 df <- data.frame(dt)
+head(df)
 
+df %>%
+  ggplot(aes(x = landcover, y = B_median, fill=landcover)) +
+  geom_violin(trim = FALSE,                            # avoid trimming the trails
+              draw_quantiles = c(0.25, 0.5, 0.75),     # add quantiles
+              alpha = 0.5) +
+  geom_boxplot(width = 0.07,position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = cpal_az)
 
+df %>%
+  ggplot(aes(x = landcover, y = BSI_median, fill=landcover)) +
+  geom_violin(trim = FALSE,                            # avoid trimming the trails
+              draw_quantiles = c(0.25, 0.5, 0.75),     # add quantiles
+              alpha = 0.5) +
+  geom_boxplot(width = 0.07,position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = cpal_az)
 
+df %>%
+  ggplot(aes(x = landcover, y = NDMI_median, fill=landcover)) +
+  geom_violin(trim = FALSE,                            # avoid trimming the trails
+              draw_quantiles = c(0.25, 0.5, 0.75),     # add quantiles
+              alpha = 0.5) +
+  geom_boxplot(width = 0.07,position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = cpal_az)
+
+df %>%
+  ggplot(aes(x = landcover, y = B_stdDev, fill=landcover)) +
+  geom_violin(trim = FALSE,                            # avoid trimming the trails
+              draw_quantiles = c(0.25, 0.5, 0.75),     # add quantiles
+              alpha = 0.5) +
+  geom_boxplot(width = 0.07,position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = cpal_az)
+
+df %>%
+  ggplot(aes(x = landcover, y = BSI_stdDev, fill=landcover)) +
+  geom_violin(trim = FALSE,                            # avoid trimming the trails
+              draw_quantiles = c(0.25, 0.5, 0.75),     # add quantiles
+              alpha = 0.5) +
+  geom_boxplot(width = 0.07,position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = cpal_az)
+
+df %>%
+  ggplot(aes(x = landcover, y = NDMI_stdDev, fill=landcover)) +
+  geom_violin(trim = FALSE,                            # avoid trimming the trails
+              draw_quantiles = c(0.25, 0.5, 0.75),     # add quantiles
+              alpha = 0.5) +
+  geom_boxplot(width = 0.07,position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = cpal_az)
 ```
 
 
+
+```{r}
+# #save.image(file="D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/superclass_RF_landsat8_workspace.RData")
+
+#load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/SC/superclass_RF_landsat8_workspace.RData")
+```
 
 
