@@ -1,0 +1,33 @@
+
+# merging is done in two steps, since merging 150 rasters at once seemed veeeery slow
+
+#  1: merge by row (tiles at same latitude) - also fill NAs with GEE DEM values
+lf_rows <- substr(lf_tiles_short, 1,3)
+
+list_raster_tiles_grouped <- split(list_raster_tiles1, lf_rows)
+
+
+
+cl <- makeCluster(length(list_raster_tiles_grouped))    # careful, this is 17 at the moment, so 17 cores. Check first if you can do this and adjust
+clusterExport(cl = cl, c("list_raster_tiles_grouped", "wd_tiles_by_row"))
+mosaic_groups <- parLapply(cl = cl, X = names(list_raster_tiles_grouped),
+                           fun = function(x){
+  tmp <- do.call(raster::merge, list_raster_tiles_grouped[[x]])
+
+  raster::writeRaster(tmp, filename = file.path(wd_tiles_by_row, paste0(x, ".tif")), datatype = "INT2S")    # have to save them, otherwise in step2 merge() doesn't have access (due to multicore I guess)
+})
+
+stopCluster(cl)
+
+
+# Step 2: merge those rows (and also fill NAs with GEE DEM)   
+# creates one massive DEM with NAs filled
+lf_row_rasters <- list.files(wd_tiles_by_row, pattern = ".tif$", full.names = T)
+list_raster_rows <- lapply(lf_row_rasters, raster)
+system.time(mosaic1 <- do.call(merge, c(list_raster_rows)))
+
+writeRaster(mosaic1, 
+            filename =file.path(dirname(wd_tiles), "merged_SRTM30m_AOI_withNAs_R_int32_highcompress_v2.tif"),
+            datatype = "INT2S",
+            options = c("COMPRESS=DEFLATE", "PREDICTOR=2")
+)
