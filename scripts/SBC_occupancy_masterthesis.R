@@ -48,7 +48,6 @@ recTable$Species <- sapply(recTable$Species, function(x) as.character(gsub("Whit
 
 
 
-
 # Warning: At 1 stations there were records before camera operation date range:  PY029 
 recTable$DateTimeOriginal[recTable$DateTimeOriginal == "2020-04-03 06:02:00" & 
                             recTable$station == "PY029"] <- "2021-04-03 06:02:00" 
