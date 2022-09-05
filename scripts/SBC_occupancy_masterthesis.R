@@ -48,6 +48,7 @@ recTable$Species <- sapply(recTable$Species, function(x) as.character(gsub("Whit
 
 
 
+
 # Warning: At 1 stations there were records before camera operation date range:  PY029 
 recTable$DateTimeOriginal[recTable$DateTimeOriginal == "2020-04-03 06:02:00" & 
                             recTable$station == "PY029"] <- "2021-04-03 06:02:00" 
@@ -86,15 +87,16 @@ cov <- read.csv(file = file.path(path1, "covariates_quycttable_rmdoublestation_e
 rownames(cov) <- cov$X
 covariates <- cov[-1]
 
-# matrix contains attributes of scaled covs we need for backtransforming for prediction 
-covariates_scaled_matrix <- scale(covariates[,1:(length(covariates)/2)]) 
-
 # add columns with squared covariates
 covariates_sq <- cbind(covariates,
                        scale.elevation_sq = covariates$scale.elevation^2,
                        scale.habitat_sq = covariates$scale.habitat^2,
                        scale.remoteness_sq = covariates$scale.remoteness^2
 )
+
+# matrix contains attributes of scaled covs we need for backtransforming for prediction 
+covariates_scaled_matrix <- scale(covariates_sq[,1:(length(covariates_sq)/3)]) 
+
 
 
 # 3. Collinearity test ================================================================================================
@@ -537,10 +539,12 @@ DT::datatable(modsel_df_round[[43]])
 #### --> save / import R.data ---------------------------------------------------------------------------------------------
 
 # Save whole workspace to working directory (date: 01.09.2022)
-save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
+#save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
 
 # Load workspace back to RStudio
-load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/all_data.RData")
+#load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
+
+
 
 
 
@@ -549,143 +553,250 @@ load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupa
 ### HIER HÄNGTS NOCH ####
 # an daten im script angepasst, aber plots wollen nicht
 
-# 
-# #> To visualise habitat associations, we can plot response curves for each species, 
-# #> based on the models in modelselection tables above (A2.), showing standard errors (darkgrey) 
-# #> and 95% confidence intervals (lightgrey).
-# 
-# 
-# # Set path to source code for adapted plotfunction
-# source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/PlotResponseCurves_uni.R"))
-# 
-# covplot <- sapply(fms[[43]]@fits[-1], continuous.plot2, modsel = modsel, covariates = covariates_sq %>% select( -matches("scale.")), quiet = TRUE)
-# 
-# 
-# # Set path to source code for adapted plotfunction
-# #source(file.path(wd,"/scripts/PlotResponseCurves_uni.R"))
-# source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/multi-plot_edit_LP.R"))
-# 
-# tmpdir <- tempdir()
-# 
-# for (i in 43:43){#1:length(unique(detHist))){
-# 
-#   # cat("\n")
-#   # cat("#####", names(detHist)[i], "  \n")
-# 
-#   if (names(fms[[i]]@fits) != "~1 ~ 1")  # original: "~Effort ~ 1"
-#     #print("true"
-# 
-#     multiplot.wrapper(model.list = fms[[i]]@fits,
-#                               siteCovs_unscaled = covariates %>% select( -matches("scale.")),
-#                               modelRanking = modsel[[i]],
-#                               occasionLength = occasionLength,
-#                               #plotnames.by.rank ,
-#                               plotDir = tmpdir,
-#                               speciesVector = relevantspecies$species[[i]],
-#                               #index_tmp = 1,
-#                               addRug = TRUE,
-#                               #maximumRankToPlot = 200,
-#                               plotModelsBelowNullModel = F,
-#                               quiet = T
-# )
-# 
-# 
-#   else(
-#     #print("nullmodel was bestmodel, so no covariates explain occuence")
-#     multiplot.wrapper(model.list = fms[[i]]@fits[2],
-#                               siteCovs_unscaled = covariates %>% select( -matches("scale.")),
-#                               modelRanking = modsel[[i]],
-#                               occasionLength = occasionLength,
-#                               #plotnames.by.rank ,
-#                               plotDir = tmpdir,
-#                               speciesVector = relevantspecies$species[[i]],
-#                               #index_tmp = 1,
-#                               addRug = TRUE,
-#                               #maximumRankToPlot = 200,
-#                               plotModelsBelowNullModel = F,
-#                               quiet = T
-#     )
-#     )
-#     # cat("   \n")
-# }
-# 
-# 
-# 
-# 
-# # 6. Predictions ==============================================================================================
-# 
-# # Set path to sourcecode to calculate predictions
-# 
-# source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/predict_manual.R"))
-# 
-# 
-# ## 6.1 Import and scale covariate rasters =========================================================================
-# 
-# ### Elevation ======================================================================================================
-# 
-# # Import elevation raster
-# elevationraster <- raster("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/USAID/clippedmasked_covariates/merged_SRTM30m_AOI_NAs_filled_R_int32_highcompress_clipmask.tif")
-# 
-# # Clip to extent of aoi
-# elevationraster <- raster::crop(elevationraster, extent(aoi))
-# 
-# # Aggregate 30m elevation raster to 200m resolution to match with other rasters
-# elevr_agg <- aggregate(elevationraster, fact = (200/30), fun = mean, na.rm = TRUE)
-# 
-# # Mask raster with studyarea
-# elevmaskp <- raster::mask(x=elevr_agg, mask=aoi)
-# 
-# # Scale elevation raster
-# elevationraster_scaled <- (elevmaskp - attr(covariates_scaled_matrix, "scaled:center")[colnames(covariates_scaled_matrix) == "elevation"] ) /  attr(covariates_scaled_matrix, "scaled:scale")[colnames(covariates_scaled_matrix) == "elevation"]
-# 
-# 
-# 
-# ### Habitat ======================================================================================================
-# 
-# # Import LC probability raster
-# LCprob <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Sentinel/final_SVN/RF_prob_td2.8_wsmp10000_spl0.7_scale10-100.tif")
-# Hab3raster <- LCprob$Semidry.Dry.Forest
-#   
-# # Clip to extent of aoi
-# #Hab3raster <- raster::crop(Hab3raster, extent(aoi))
-# 
-# # Aggregate 100m LC raster to 200m resolution to match with other rasters
-# Hab3r_agg <- aggregate(Hab3raster, fact = (200/100), fun = mean, na.rm = TRUE)
-# 
-# # Mask raster with studyarea
-# #Hab3maskp <- raster::mask(x=Hab3r_agg, mask=aoi)
-# 
-# # Scale Hab3 raster
-# Hab3raster_scaled <- (Hab3r_agg - attr(covariates_scaled_matrix, "scaled:center")[colnames(covariates_scaled_matrix) == "habitat"] ) /  attr(covariates_scaled_matrix, "scaled:scale")[colnames(covariates_scaled_matrix) == "habitat"]
-# 
-# 
-# 
-# ### Remoteness ======================================================================================================
-# 
-# 
-# 
-# 
-# 
-# 
-# # 6.2 Create rasterstack ============================================================================
-# 
-# # rename scaled covariate rasters
-# elevr <- elevationraster_scaled
-# hab3r <- Hab3raster_scaled
-# 
-# 
-# # resample rasters for raster stack
-# #elevr <- resample(elevr, villdensr)
-# hab3r <- resample(hab3r, elevr)
-# 
-# 
-# # stack rasters
-# predstack <- raster::stack(elevr, hab3r)
-# names(predstack) <- c("scale.elevation", "scale.habitat")
-# 
-# 
-# # Make predictions
-# 
-# 
-# prediction_o.mod1 <- lapply(o.mod1, FUN = predict_manual, covariate_raster_stack = predstack)
-# 
+
+#> To visualise habitat associations, we can plot response curves for each species,
+#> based on the models in modelselection tables above (A2.), showing standard errors (darkgrey)
+#> and 95% confidence intervals (lightgrey).
+
+
+# Set path to source code for adapted plotfunction
+source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/PlotResponseCurves_uni.R"))
+
+covplot <- sapply(fms[[43]]@fits[-1], continuous.plot2, modsel = modsel, covariates = covariates_sq %>% select( -matches("scale.")), quiet = TRUE)
+
+
+# Set path to source code for adapted plotfunction
+#source(file.path(wd,"/scripts/PlotResponseCurves_uni.R"))
+source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/multi-plot_edit_LP.R"))
+
+tmpdir <- tempdir()
+
+for (i in 43:43){#1:length(unique(detHist))){
+
+  # cat("\n")
+  # cat("#####", names(detHist)[i], "  \n")
+
+  if (names(fms[[i]]@fits) != "~1 ~ 1")  # original: "~Effort ~ 1"
+    #print("true"
+
+    multiplot.wrapper(model.list = fms[[i]]@fits,
+                              siteCovs_unscaled = covariates %>% select( -matches("scale.")),
+                              modelRanking = modsel[[i]],
+                              occasionLength = occasionLength,
+                              #plotnames.by.rank ,
+                              plotDir = tmpdir,
+                              speciesVector = relevantspecies$species[[i]],
+                              #index_tmp = 1,
+                              addRug = TRUE,
+                              #maximumRankToPlot = 200,
+                              plotModelsBelowNullModel = F,
+                              quiet = T
+)
+
+
+  else(
+    #print("nullmodel was bestmodel, so no covariates explain occuence")
+    multiplot.wrapper(model.list = fms[[i]]@fits[2],
+                              siteCovs_unscaled = covariates %>% select( -matches("scale.")),
+                              modelRanking = modsel[[i]],
+                              occasionLength = occasionLength,
+                              #plotnames.by.rank ,
+                              plotDir = tmpdir,
+                              speciesVector = relevantspecies$species[[i]],
+                              #index_tmp = 1,
+                              addRug = TRUE,
+                              #maximumRankToPlot = 200,
+                              plotModelsBelowNullModel = F,
+                              quiet = T
+    )
+    )
+    # cat("   \n")
+}
+
+
+
+
+# 6. Predictions ==============================================================================================
+
+# Set path to sourcecode to calculate predictions
+
+source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/predict_manual.R"))
+
+
+## 6.1 Import and scale covariate rasters =========================================================================
+
+#> 1. Import whole raster       (r <- raster::raster("path-to-raster.tif"))
+#> 2. Crop to aoi               (rc <- raster::crop(r, as_spatial(aoi)))
+#> 3. Mask with AOI             (rm <- raster::mask(rc, as_Spatial(aoi)))
+#> 4. Aggregate to higher res   (ragg <- raster::aggregate(r, fact = (200/30), fun = mean, na.rm = TRUE))
+
+
+
+### Elevation ======================================================================================================
+
+# Import elevation raster
+elevationraster <- raster("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Elevation/final_SVN/SRTM30m_NAs_filled_SVN_mask_int2s.tif")
+
+# Aggregate 30m elevation raster to 200m resolution to match with other rasters
+#elevr_agg <- aggregate(elevationraster, fact = (200/30), fun = mean, na.rm = TRUE)
+#writeRaster(elevr_agg, "D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Elevation/final_SVN/SRTM30m_NAs_filled_SVN_mask_int2s_200m.tif")
+elevr_agg <- raster("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Elevation/final_SVN/SRTM30m_NAs_filled_SVN_mask_int2s_200m.tif")
+
+# Scale elevation raster
+elevationraster_scaled <- (elevr_agg - attr(covariates_scaled_matrix, "scaled:center")[colnames(covariates_scaled_matrix) == "elevation"] ) /  attr(covariates_scaled_matrix, "scaled:scale")[colnames(covariates_scaled_matrix) == "elevation"]
+
+
+
+### Habitat ======================================================================================================
+
+# Import LC probability raster
+LCprob <- raster::stack("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Sentinel/final_SVN/RF_prob_td2.8_wsmp10000_spl0.7_scale10-100.tif")
+Hab3raster <- LCprob$Semidry.Dry.Forest
+
+# Clip to extent of aoi
+#Hab3raster <- raster::crop(Hab3raster, extent(aoi))
+
+# Aggregate 100m LC raster to 200m resolution to match with other rasters
+#Hab3r_agg <- aggregate(Hab3raster, fact = (200/100), fun = mean, na.rm = TRUE)
+#writeRaster(Hab3r_agg, "D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Sentinel/final_SVN/RF_prob_hab3_td2.8_wsmp10000_spl0.7_scale10-100_200.tif")
+Hab3r_agg <- raster("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Sentinel/final_SVN/RF_prob_hab3_td2.8_wsmp10000_spl0.7_scale10-100_200.tif")
+
+# Mask raster with studyarea
+#Hab3maskp <- raster::mask(x=Hab3r_agg, mask=aoi)
+
+# Scale Hab3 raster
+Hab3raster_scaled <- (Hab3r_agg - attr(covariates_scaled_matrix, "scaled:center")[colnames(covariates_scaled_matrix) == "habitat"] ) /  attr(covariates_scaled_matrix, "scaled:scale")[colnames(covariates_scaled_matrix) == "habitat"]
+
+
+
+### Remoteness ======================================================================================================
+
+# Import remoteness raster
+remraster <- raster("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Accessibility/cumCostraster_h_SVN_osm05052022_10kmbuffer_excl_footpath.tif")
+
+# Aggregate 30m remoteness raster to 200m resolution to match with other rasters
+#remr_agg <- aggregate(remraster, fact = (200/30), fun = mean, na.rm = TRUE)
+#writeRaster(remr_agg, "D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Accessibility/cumCostraster_h_SVN_osm05052022_10kmbuffer_excl_footpath_200.tif")
+remr_agg <- raster("D:/Dateien/Uni/Eagle_Master/Masterthesis/Data/Accessibility/cumCostraster_h_SVN_osm05052022_10kmbuffer_excl_footpath_200.tif")
+
+# Scale elevation raster
+remraster_scaled <- (remr_agg - attr(covariates_scaled_matrix, "scaled:center")[colnames(covariates_scaled_matrix) == "remoteness"] ) /  attr(covariates_scaled_matrix, "scaled:scale")[colnames(covariates_scaled_matrix) == "remoteness"]
+
+
+
+### HIER STEHEN GEBLIEBEN ####
+
+# 6.2 Create rasterstack ============================================================================
+
+# rename scaled covariate rasters
+elevr <- elevationraster_scaled
+hab3r <- Hab3raster_scaled
+remr <- remraster_scaled
+
+# resample rasters for raster stack
+#elevr <- resample(elevr, villdensr)
+elevr
+hab3r <- resample(hab3r, elevr)
+remr <- resample(remr, elevr)
+
+# stack rasters
+predstack <- raster::stack(elevr, hab3r, remr)
+names(predstack) <- c("scale.elevation", "scale.habitat", "scale.remoteness")
+
+
+# 6.3 Make predictions ---------------------------------------------------------------------------------------
+
+modsel_df_round[43]
+# --> SBC bestmodels: 5, 14, 12, Nullmodel
+
+
+## --> predict_manual not applicable to multiple covariate models! 
+# prediction_o.mod5 <- lapply(o.mod5, FUN = predict_manual, covariate_raster_stack = predstack)
+# prediction_o.mod14 <- lapply(o.mod14, FUN = predict_manual, covariate_raster_stack = predstack)
+# prediction_o.mod12 <- lapply(o.mod12, FUN = predict_manual, covariate_raster_stack = predstack)
+
+
+# Either use predict or try to create data frame with rastervalues and make predictions out of this
+vals <- as.data.frame(values(predstack))
+vals_subset <- vals[which(!is.na(rowSums(vals))),]
+tmp2 <- lapply(o.mod5, FUN = predict, type = "state", newdata = vals_subset)
+
+
+prediction_o.mod5 <- lapply(o.mod5, FUN = predict, newdata  = predstack, type = "state")
+prediction_o.mod14 <- lapply(o.mod14, FUN = predict, newdata  = predstack, type = "state")
+prediction_o.mod12 <- lapply(o.mod12, FUN = predict, newdata  = predstack, type = "state")
+
+prediction_o.mod5[[43]]
+
+# Save as Rdata-file in working directory (getwd)
+save(list=c("prediction_o.mod5",
+            "prediction_o.mod14",
+            "prediction_o.mod12"), 
+     file = "D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_bestmodels_prediction_1.9.Rdata")
+
+# Load prediction data into global environment
+load(file = file.path("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_bestmodels_prediction_1.9.Rdata"))
+
+
+
+
+
+# So far predictions not possible for models 3, 6 and 10, because nullmodels are bestmodels
+# Predictions from rasters can take a while, so once generated, save as file.Rdata in working directoriy and load data in script when needed
+
+  # Make predictions (with predict from raster)
+  prediction_o.mod1multi <- lapply(o.mod1_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod2multi <- lapply(o.mod2_multi, FUN = predict, newdata  = predstack, type = "state")
+  #prediction_o.mod3multi <- lapply(o.mod3_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod4multi <- lapply(o.mod4_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod5multi <- lapply(o.mod5_multi, FUN = predict, newdata  = predstack, type = "state")
+  #prediction_o.mod6multi <- lapply(o.mod6_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod7multi <- lapply(o.mod7_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod8multi <- lapply(o.mod8_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod9multi <- lapply(o.mod9_multi, FUN = predict, newdata  = predstack, type = "state")
+  #prediction_o.mod10multi <- lapply(o.mod10_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod11multi <- lapply(o.mod11_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod12multi <- lapply(o.mod12_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod13multi <- lapply(o.mod13_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod14multi <- lapply(o.mod14_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod15multi <- lapply(o.mod15_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod16multi <- lapply(o.mod16_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod17multi <- lapply(o.mod17_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod18multi <- lapply(o.mod18_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod19multi <- lapply(o.mod19_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod20multi <- lapply(o.mod20_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod21multi <- lapply(o.mod21_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod22multi <- lapply(o.mod22_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod23multi <- lapply(o.mod23_multi, FUN = predict, newdata  = predstack, type = "state")
+  prediction_o.mod24multi <- lapply(o.mod24_multi, FUN = predict, newdata  = predstack, type = "state")
+
+# # Save as Rdata-file in working directory (getwd)
+# save(list=c("prediction_o.mod1multi",
+#             "prediction_o.mod2multi",
+#             #"prediction_o.mod3multi",
+#             "prediction_o.mod4multi",
+#             "prediction_o.mod5multi",
+#             #"prediction_o.mod6multi",
+#             "prediction_o.mod7multi",
+#             "prediction_o.mod8multi",
+#             "prediction_o.mod9multi",
+#             #"prediction_o.mod10multi",
+#             "prediction_o.mod11multi",
+#             "prediction_o.mod12multi",
+#             "prediction_o.mod13multi",
+#             "prediction_o.mod14multi",
+#             "prediction_o.mod15multi",
+#             "prediction_o.mod16multi",
+#             "prediction_o.mod17multi",
+#             "prediction_o.mod18multi",
+#             "prediction_o.mod19multi",
+#             "prediction_o.mod20multi",
+#             "prediction_o.mod21multi",
+#             "prediction_o.mod22multi",
+#             "prediction_o.mod23multi",
+#             "prediction_o.mod24multi"), file = "predictionmodels_multi.Rdata")
+
+# Load prediction data into global environment
+load(file.path(wd,"scripts/predictionmodels_multi.Rdata"))
+
+
