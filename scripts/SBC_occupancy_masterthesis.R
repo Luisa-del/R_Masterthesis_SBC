@@ -3,22 +3,15 @@
 #     MASTER THESIS     LUISA PFLUMM      >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-#library(camtrapR)        # latest version: install_github("jniedballa/camtrapR"), library(remotes)
 library(unmarked)
 library(raster)
 library(rgeos)
-# library(Hmisc)
-# library(corrplot)
 library(lubridate)
 library(usdm)
-# library(sp)
 library(sf)
-#library(gdistance)
 library(ggcorrplot)
 library(ggpubr)
 library(GGally)
-# library(rgdal)
-# library(RColorBrewer)
 library(DT)
 library(data.table)
 library(dplyr)
@@ -42,7 +35,7 @@ path1 <- "C:/Users/s347553/Documents/Masterthesis/Data/CT"
 
 # Import CT and record tables
 recTable <- read.csv(file = file.path(path1, "Quy/corrected_recTable_Quy_editLP_shareJN.csv"))
-CTtable <- read.csv(file = file.path(path1, "Quy/corrected_CTtable_Quy_editLP_shareJN.csv"))
+CTtable <- read.csv2(file = file.path(path1, "CTfinal/CTtables_combined.csv"), sep = ";")
 
 
 
@@ -90,90 +83,32 @@ recTable$Date[recTable$Date == "4/1/2020" & recTable$Date == "PY029"] <- "4/1/20
 
 # 2. Covariates =============================================================================================================
 
-# ## -> no duplicate dataset ###
-# # Import covariates
-# cov <- read.csv(file = file.path(path1, "covariates_quycttable_rmdoublestation_elev_hab3_rem_td2.8_smp10000_spl0.7_scale10-100.csv"))
-# cov <- data.frame(cov[order(cov$X),])   #decreasing = TRUE
-# rownames(cov) <- cov$X
-# covariates <- cov[-1]
+# import elevation
+e <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/CTfinal/cov_elev_CTall_utm.csv")
 
+# import habitat
+h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/CTfinal/cov_hab10-100_10000_CTall_utm.csv")
+h[167,2] <- 0.106   #-> in this case station ncs003 has no value because point to close at rim of mask, aggregated values --> 0
 
-# # # add columns with squared covariates
-# # covariates_sq <- cbind(covariates,
-# #                        scale.elevation_sq = covariates$scale.elevation^2,
-# #                        scale.habitat_sq = covariates$scale.habitat^2,
-# #                        scale.remoteness_sq = covariates$scale.remoteness^2
-# # )
-# 
-# # matrix contains attributes of scaled covs we need for backtransforming for prediction
-# covariates_scaled_matrix <- scale(covariates_sq[,1:(length(covariates_sq)/3)])
-# # covariates_scaled_matrix2 <- scale(covariates_sq[,1:(length(covariates_sq)/3)])^2
-# 
-# ### ?? ----
+# import remoteness
+#d <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/CTfinal/cov_dist_CTall_utm.csv")
+# --> Distance raster mit vorsicht genießen, werte verändern sich nur alle 30m, da SRTM als basis
 
+# # combine covariates
+# covariates <- cbind(e[2],h[2],d[2])
+# names(covariates) <- c("elevation", "habitat", "distance")
+
+# combine covariates
+covariates <- cbind(e[2],h[2])
+names(covariates) <- c("elevation", "habitat")
 
 
 
-# # -> duplicate dataset ######
-# # Import covariates
-# 
-# # from 100m prediction
-# cov <- read.csv(file = file.path(path1, "cov_elev_hab100_hab10_rem_CTquy_all_compare_proj.csv"))
-# 
-# 
-# ## CHECK IF ALL COVARIATES HAVE SAME ORDER BY STATION!
-# 
-# # Set stations as rownames
-# rownames(cov) <- cov$X
-# cov <- cov[-1]
-# 
-# # select only required covs
-# covariates <- cov[endsWith(names(cov), "utm")]   # utm
-# covariates <- covariates[,c(1,5,7)]
-# names(covariates) <- c("elevation", "habitat", "remoteness")
-
-
-## >>>>>>>>> R E P L A C E >>>>>>>>>>
-
-# # replace habitat with other output
-# #y <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_sfd_CTquy_all_utm.csv")
-# y <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_comb23_CTquy_all_utm.csv")
-# covariates$habitat <- y$habitat200_buff30_utm
-
-
-## >>>>>>>>> R E P L A C E >>>>>>>>>>
-
-e <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_elev_CTquy_all_compare_proj.csv")
-row.names(e) <- e$X
-e <- e[endsWith(names(e), "utm")]   # utm
-
-
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab10_CTquy_all_utm.csv")
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_CTquy_all_utm.csv")
-
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab10_sfd_CTquy_all_utm.csv")
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_sfd_CTquy_all_utm.csv")
-
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab10_comb23_CTquy_all_utm.csv")
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_comb23_CTquy_all_utm.csv")
-
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_fract1_CTquy_all_utm.csv")
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_fract2_CTquy_all_utm.csv")
-
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_80_CTquy_all_utm.csv")
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab200_coast20_CTquy_all_utm.csv")
-#h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab10-200_10000_CTquy_all_utm.csv")
-h <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_hab10-100_10000_CTquy_all_utm.csv")
-
-
-r <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/cov_rem_CTquy_all_compare_proj.csv")
-
-covariates <- cbind(e[1],h[2],r[4])
-
-names(covariates) <- c("elevation", "habitat", "remoteness")
-
-## >>>>>>>>> R E P L A C E >>>>>>>>>>
-
+# # import remoteness
+# r <- read.csv("C:/Users/s347553/Documents/Masterthesis/Data/CT/CTfinal/cov_rem_CTall_utm.csv")
+# # combine covariates
+# covariates <- cbind(e[2],h[2],r[2],d[2])
+# names(covariates) <- c("elevation", "habitat", "remoteness", "distance")
 
 
 # Scale continuous covariates, check dimension (length) and NA values
@@ -197,13 +132,10 @@ datatable(round(covariates,2),extensions = 'FixedColumns',options = list(scrollX
 
 
 
-# add columns with squared covariates
-covariates_sq <- cbind(covariates,
-                       scale.elevation_sq = covariates$scale.elevation^2,
-                       scale.habitat_sq = covariates$scale.habitat^2,
-                       scale.remoteness_sq = covariates$scale.remoteness^2
-)
-covariates <- covariates_sq
+# add columns with squared covariate
+covariates <- cbind(covariates,
+                    scale.elevation_sq = covariates$scale.elevation^2)
+datatable(round(covariates,2),extensions = 'FixedColumns',options = list(scrollX = TRUE,scrollCollapse = TRUE))
 dim(covariates)
 
 
@@ -221,18 +153,18 @@ dim(covariates)
 # Compute a correlation matrix
 (corr <- round(cor(covariates %>% select( -matches("scale."))), 2))
 
-  # create corrplot for manyand export as pdf or image
-  ggcorrplot <- ggcorrplot(corr,                             # visualize the correlation-matrix
-                           hc.order = FALSE,                  # use hierarchical clustering
-                           type = "lower",                    # alternative: upper, full
-                           lab = TRUE,                        # add correlation coefficients, change size
-                           ggtheme = ggplot2::theme_grey(),   # alternative: ggplot2::theme_minimal, ggplot2::theme_dark
-                           title = "Correlation of Covariates"
-                           # p.mat = p.mat,                   # Barring the no significant coefficient
-  ) +
-    theme(plot.title = element_text(size=22))                  # add other relevant theme and guides methods (still ggplot2 object)
+# create corrplot for manyand export as pdf or image
+ggcorrplot <- ggcorrplot(corr,                             # visualize the correlation-matrix
+                         hc.order = FALSE,                  # use hierarchical clustering
+                         type = "lower",                    # alternative: upper, full
+                         lab = TRUE,                        # add correlation coefficients, change size
+                         ggtheme = ggplot2::theme_grey(),   # alternative: ggplot2::theme_minimal, ggplot2::theme_dark
+                         title = "Correlation of Covariates"
+                         # p.mat = p.mat,                   # Barring the no significant coefficient
+) +
+  theme(plot.title = element_text(size=22))                  # add other relevant theme and guides methods (still ggplot2 object)
 
-  plot(ggcorrplot)
+plot(ggcorrplot)
 
 (vif <- vifcor(covariates %>% select( -matches("scale.")), th=0.7))
 
@@ -254,7 +186,7 @@ camop_matrix <- cameraOperation(CTtable = CTtable,
                                 allCamsOn = FALSE,
                                 camerasIndependent = TRUE,
                                 writecsv = FALSE,
-                                dateFormat = "ymd"
+                                dateFormat = "dmy" #"ymd"
                                 #outDir = outDir,
 )
 
@@ -311,8 +243,8 @@ rownames(relevantspecies) <- nrow(1:length(relevantspecies))
 ### Activity plot ###
 
 for (i in 43:43) { #1:length(unique(relevantspecies[,"species"]))) {
- activityDensity(recordTable = recTable,
-                 species     = relevantspecies$species[43])   #43
+  activityDensity(recordTable = recTable,
+                  species     = myspecies)   #relevantspecies$species[43]
 }
 
 
@@ -325,12 +257,12 @@ aoi <- shapefile("C:/Users/s347553/Documents/Masterthesis/Data/SVN_SBC_provinces
 for (i in 43:43){ #1:length(unique(relevantspecies[,"species"]))) {
   detectionMaps( CTtable       = CTtable,
                  recordTable   = recTable,
-                 Xcol          = "UTM_X",
-                 Ycol          = "UTM_Y",
+                 Xcol          = "long", #"UTM_X",
+                 Ycol          = "lat", #"UTM_Y",
                  backgroundPolygon = aoi,        # enable if you want to add background polygon
                  stationCol    = "station",
                  speciesCol    = "Species",
-                 speciesToShow = relevantspecies$species[43],          # enable if you want to plot just one species
+                 speciesToShow = myspecies,  #relevantspecies$species[43],          # enable if you want to plot just one species
                  printLabels   = FALSE,
                  richnessPlot  = FALSE,                      # set TRUE to create map of the number of observed species
                  speciesPlots  = TRUE,                       # set TRUE to create single plots for each species
@@ -340,7 +272,7 @@ for (i in 43:43){ #1:length(unique(relevantspecies[,"species"]))) {
                  # shapefileName       = "SBC_occ_detections", #shapefileName,
                  # shapefileDirectory  = file.path(path1, "shps"), #pathout_shapefiles,
                  # shapefileProjection = "+proj=longlat +datum=WGS84 +no_defs" #shapefileProjection)
-                 )
+  )
 }
 
 
@@ -362,321 +294,197 @@ camop_matrix <- camop_matrix
 timeZone <- "Asia/Ho_Chi_Minh" # change the time zone based on your study area
 occasionLength <- 5 # change the occasion length based on your study
 
-# containers for new outputlists
-detHist <- list()
-detection_history <- list()   # not necessary
-effort <- list()              # not necessary
 
-for (i in 43:43){ #1:length(unique(relevantspecies[,"species"]))) {
-   detHist.sb <- detectionHistory(recordTable = recTable,
-                                  species = myspecies, #relevantspecies$species[[i]],
-                                  camOp = camop_matrix,
-                                  speciesCol = "Species",
-                                  stationCol = "station",
-                                  occasionLength =  occasionLength,
-                                  day1 = "station",
-                                  datesAsOccasionNames = FALSE,
-                                  includeEffort = TRUE,
-                                  scaleEffort = FALSE,
-                                  writecsv = FALSE,                            # set TRUE if you want csv-file
-                                  timeZone = timeZone#,
-                                  #outDir = file.path(wd,"/Output")
-                                  )
-
-  # list with effort und detectionhistory for all species
-  detHist[[i]] <- detHist.sb                                   
+  detHist <- detectionHistory(recordTable = recTable,
+                                 species = myspecies, #relevantspecies$species[[i]],
+                                 camOp = camop_matrix,
+                                 speciesCol = "Species",
+                                 stationCol = "station",
+                                 occasionLength =  occasionLength,
+                                 day1 = "station",
+                                 datesAsOccasionNames = FALSE,
+                                 includeEffort = TRUE,
+                                 scaleEffort = FALSE,
+                                 writecsv = FALSE,                            # set TRUE if you want csv-file
+                                 timeZone = timeZone#,
+                                 #outDir = file.path(wd,"/Output")
+  )
   
-  # # lists with detectionhistory and effort for all species (not necessary)
-  # detection_history[[i]] <- detHist.sb$detection_history      
-  # effort[[i]] <- detHist.sb$effort
-
-}
-
-# assign species names to detHist-list
-#names(detHist) <- unique(relevantspecies[,"species"])
-
-
-#deth <- data.frame(detHist[[43]]$detection_history)
-
 
 
 
 
 ## 5.3 Unmarked frames ====================================================================================================
 
-# containers for list
-umf <- list()
 
-# create unmarked dataframes to organize detection / non-detection data along with the covariates.
-for (i in 43:43){ #1:length(unique(detHist))) {
-  umf[[i]] <- unmarkedFrameOccu(y        = as.matrix(detHist[[i]][[1]]),
-                                siteCovs = covariates,  #covariates_sq,
-                                obsCovs  = list(Effort=as.matrix(detHist[[i]][[2]])))
-}
-
-# assign species names to umf lists
-#names(umf) <- names(detHist)
-
-
+  umf <- unmarkedFrameOccu(y        = as.matrix(detHist[[1]]),
+                          siteCovs = covariates,  #covariates_sq,
+                          obsCovs  = list(Effort=as.matrix(detHist[[2]])))
+  
+  
 
 ## 5.4 Detection models ====================================================================================================
 
-#> Create detection models based on covariates dataset and choose the best detection model based on AIC 
-#> for each relevant species. The lower the AIC value the better the model.
 
-# Containes for lists
-d.mod00 <- list()
-d.mod0 <- list()
-modellist_detection <- list()
-d_modsel <- list()
-d_modsel_df <- list()
-d_modsel_df_round <- list()
-
-
-for (i in 43:43){ #1:length(unique(detHist))) {    #43:43) {     
-  
-  # Define null models
-  d.mod00[[i]] <- occu(~1 ~1, data = umf[[i]])            # no covariates
-  d.mod0[[i]] <- occu(~ Effort ~ 1, data = umf[[i]])      # effort as covariate
+    # Define null models
+  (d.mod00 <- occu(~1 ~1, data = umf))            # no covariates
+  (d.mod0 <- occu(~ Effort ~ 1, data = umf))      # effort as covariate
   
   # Create list for modelselection 
-  modellist_detection[[i]] <- fitList(fits = list("p(.) psi(.) data" = d.mod00[[i]],
-                                                  "p(Effort) psi(.) data"  = d.mod0[[i]]))
+  modellist_detection <- fitList(fits = list("p(.) psi(.) data" = d.mod00,
+                                             "p(Effort) psi(.) data"  = d.mod0))
   
   # Modelselection
-  d_modsel[[i]] <- modSel(modellist_detection[[i]])
+  (d_modsel <- modSel(modellist_detection))
   
   # Convert to df
-  d_modsel_df[[i]] <- data.frame(model = d_modsel[[i]]@Full$model,
-                            covariate = gsub("~Effort ~ ", "", d_modsel[[43]]@Full$formula, ),
-                            nPars = d_modsel[[i]]@Full$nPars,
-                            AIC=d_modsel[[i]]@Full$AIC,
-                            delta=d_modsel[[i]]@Full$delta,
-                            AICwt=d_modsel[[i]]@Full$AICwt,
-                            cumltvWt=d_modsel[[i]]@Full$cumltvWt
-                            #p.Effort=d_modsel[[i]]@Full$`p(Effort)`,
-                            #SEp.Effort=d_modsel[[i]]@Full$`SEp(Effort)`,
-                            #p.Int=d_modsel[[i]]@Full$`p(Int)`,
-                            #SEp.Int=d_modsel[[i]]@Full$`SEp(Int)`,
-                            #psi.Int=d_modsel[[i]]@Full$`psi(Int)`,
-                            #SEpsi.Int=d_modsel[[i]]@Full$`SEpsi(Int)`
+  d_modsel_df <- data.frame(model = d_modsel@Full$model,
+                                 covariate = gsub("~Effort ~ ", "", d_modsel@Full$formula, ),
+                                 nPars = d_modsel@Full$nPars,
+                                 AIC=d_modsel@Full$AIC,
+                                 delta=d_modsel@Full$delta,
+                                 AICwt=d_modsel@Full$AICwt,
+                                 cumltvWt=d_modsel@Full$cumltvWt
+                                 #p.Effort=d_modsel@Full$`p(Effort)`,
+                                 #SEp.Effort=d_modsel@Full$`SEp(Effort)`,
+                                 #p.Int=d_modsel@Full$`p(Int)`,
+                                 #SEp.Int=d_modsel@Full$`SEp(Int)`,
+                                 #psi.Int=d_modsel@Full$`psi(Int)`,
+                                 #SEpsi.Int=d_modsel@Full$`SEpsi(Int)`
   )
   
   # Round dataset
-  d_modsel_df_round[[i]] <- data.frame(d_modsel_df[[i]][, c(1,2)], round(d_modsel_df[[i]][, -c(1,2)], 3))
+  (d_modsel_df_round <- data.frame(d_modsel_df[, c(1,2)], round(d_modsel_df[, -c(1,2)], 3)))
   
-  # Plot data
-  #print(datatable(d_modsel_df_round[[i]]))
-  #print(knitr::kable(d_modsel_df_round[[i]], row.names = FALSE, caption = paste0("Modelselection ", relevantspecies$species[[i]])))
-}
+  
+  # # Plot data
+  # DT::datatable(d_modsel_df_round)
 
-warnings() # --> 3 sites have been discarded because of missing data.
 
-# # assign species names to lists
-# names(d.mod00) <- names(d.mod0) <- names(modellist_detection) <- names(d_modsel)  <- 
-# names(d_modsel_df) <- names(d_modsel_df_round) <- names(detHist)
-
-# detection modelselection of SBC
-d_modsel_df_round[43]
 
 
 
 
 ## 5.5 Occupancy models ====================================================================================================
 
-### ??? list all possible model combinations -----------------------------------------------------------
-
-# # create list of al possible combinations for each species
-# vars <- list()
-# vc <- list()
-# models <- list()
-# 
-# for (i in 1:length(unique(detHist))){
-#   vars[[i]] <- modsel_df[[i]]$covariate
-#   for (l in 1:length(unique(vars[[i]]))){
-#     vc[[l]] <- combn(vars[[i]],l)
-#     for (j in 1:ncol(vc[[l]])){
-#       model <- as.formula(paste0("~ Effort ~", paste0(vc[[l]][,j], collapse = "+")))
-#       models <- c(models, model)
-#     }
-#   }
-# }
-# 
-
-
+### model combinations -----------------------------------------------------------
 
 # scaled covariates have to exist as variables in R environment.
 scale.elevation <- covariates$scale.elevation
 scale.habitat<- covariates$scale.habitat
-scale.remoteness <- covariates$scale.remoteness
+#scale.remoteness <- covariates$scale.remoteness
+#scale.distance <- covariates$scale.distance
+scale.elevation_sq <- covariates$scale.elevation_sq
 
-#scale.elevation_sq <- covariates_sq$scale.elevation_sq
-# scale.habitat_sq <- covariates_sq$scale.habitat_sq
-# scale.remoteness_sq <- covariates_sq$scale.remoteness_sq
-
-
-# Containes for lists
-d.mod <- list()
-o.mod1 <- list()
-o.mod2 <- list()
-o.mod3 <- list()
-o.mod4 <- list()
-o.mod5 <- list()
-o.mod6 <- list()
-o.mod7 <- list()
-
-# o.mod8 <- list()
-# o.mod9 <- list()
-# o.mod10 <- list()
-# o.mod11 <- list()
-# o.mod12 <- list()
-# o.mod13 <- list()
-# o.mod14 <- list()
-# o.mod15 <- list()
-# o.mod16 <- list()
-# o.mod17 <- list()
-# o.mod18 <- list()
-
-fms <- list()
-modsel <- list()
-modsel_df <- list()
-modsel_df_round <- list()
+# Select best detection model
+if (d_modsel@Full$model[1] == "p(.) psi(.) data") {
+  d.mod <- d.mod00
+  d <- ~1
+} else {
+  d.mod <- d.mod0
+  d <- ~Effort
+}
 
 
-for (i in 43:43){ #1:length(unique(detHist))) {       # 43:43){
+
+DOUBLECHECK ~Effort or ~1 for o.models & fitlist below
+DOUBLECHECK ~Effort or ~1 for o.models & fitlist below
+DOUBLECHECK ~Effort or ~1 for o.models & fitlist below
+DOUBLECHECK ~Effort or ~1 for o.models & fitlist below
+DOUBLECHECK ~Effort or ~1 for o.models & fitlist below
+
+
+
 
   # Define occupancy models
-  o.mod1[[i]] <- occu(~ Effort ~ scale.elevation, data = umf[[i]]) #single linear effect
-  o.mod2[[i]] <- occu(~ Effort ~ scale.habitat, data = umf[[i]]) #single linear effect
-  o.mod3[[i]] <- occu(~ Effort ~ scale.remoteness, data = umf[[i]]) #single linear model effect
-  o.mod4[[i]] <- occu(~ Effort ~ scale.elevation + scale.habitat, data = umf[[i]]) #multiple linear&quadratic effect
-  o.mod5[[i]] <- occu(~ Effort ~ scale.elevation + scale.remoteness, data = umf[[i]]) #multiple linear&quadratic effect
-  o.mod6[[i]] <- occu(~ Effort ~ scale.habitat + scale.remoteness, data = umf[[i]]) #multiple linear&quadratic effect
-  o.mod7[[i]] <- occu(~ Effort ~ scale.elevation + scale.habitat + scale.remoteness, data = umf[[i]]) #multiple linear effect
+  #single linear effect
+  o.mod1 <- occu(~ Effort ~ scale.elevation, data = umf) # --> NEEDS AUTOMATISATION!!
+  o.mod2 <- occu(~ Effort ~ scale.habitat, data = umf)   # --> can be ~Effort, can be ~1
+  #o.mod3 <- occu(~ Effort ~ scale.distance, data = umf) 
+  
+  #multiple linear effect
+  o.mod4 <- occu(~ Effort ~ scale.elevation + scale.habitat, data = umf) 
+  #o.mod5 <- occu(~ Effort ~ scale.elevation + scale.distance, data = umf) 
+  #o.mod6 <- occu(~ Effort ~ scale.habitat + scale.distance, data = umf) 
+  
+  o.mod5 <- occu(~ Effort ~ scale.elevation + scale.habitat + scale.elevation_sq, data = umf) 
+  
+  # multiple qudratic effects
+  #o.mod7 <- occu(~ Effort ~ scale.elevation + scale.habitat + scale.distance, data = umf) 
+  #o.mod8 <- occu(~ Effort ~ scale.elevation + scale.habitat + scale.distance + scale.elevation_sq, data = umf) 
+  
+  # # add remoteness?
+  # o.mod9 <- occu(~ Effort ~ scale.remoteness, data = umf) 
+  # o.mod10 <- occu(~ Effort ~ scale.remoteness + scale.distance, data = umf)
+  # o.mod11 <- occu(~ Effort ~ scale.remoteness + scale.habitat, data = umf) 
+  # o.mod12 <- occu(~ Effort ~ scale.remoteness + scale.elevation, data = umf)
+  # o.mod13 <- occu(~ Effort ~ scale.remoteness + scale.elevation + scale.habitat + scale.distance, data = umf) 
+  # o.mod14 <- occu(~ Effort ~ scale.remoteness + scale.elevation + scale.habitat + scale.distance, scale.elevation_sq, data = umf)
 
-  # o.mod8[[i]] <- occu(~ Effort ~ scale.elevation + scale.elevation_sq, data = umf[[i]]) #single linear&quadratic effect
-  # o.mod9[[i]] <- occu(~ Effort ~ scale.habitat + scale.habitat_sq, data = umf[[i]]) #single linear&quadratic effect
-  # o.mod10[[i]] <- occu(~ Effort ~ scale.remoteness + scale.remoteness_sq, data = umf[[i]]) #single linear&quadratic effect
-  #
-  # o.mod11[[i]] <- occu(~ Effort ~ scale.elevation_sq, data = umf[[i]]) #multiple linear&quadratic effect
-  # o.mod12[[i]] <- occu(~ Effort ~ scale.habitat_sq, data = umf[[i]]) #multiple linear&quadratic effect
-  # o.mod13[[i]] <- occu(~ Effort ~ scale.remoteness_sq, data = umf[[i]]) #multiple linear&quadratic effect
-  # o.mod14[[i]] <- occu(~ Effort ~ scale.elevation_sq + scale.habitat_sq, data = umf[[i]]) #multiple linear&quadratic effect
-  # o.mod15[[i]] <- occu(~ Effort ~ scale.elevation_sq + scale.remoteness_sq, data = umf[[i]]) #multiple linear&quadratic effect
-  # o.mod16[[i]] <- occu(~ Effort ~ scale.habitat_sq + scale.remoteness_sq, data = umf[[i]]) #multiple linear&quadratic effect
-  # o.mod17[[i]] <- occu(~ Effort ~ scale.elevation_sq + scale.habitat_sq + scale.remoteness_sq, data = umf[[i]]) #multiple linear effect
-  # 
-  # o.mod18[[i]] <- occu(~ Effort ~ scale.elevation + scale.habitat + scale.remoteness, + scale.elevation_sq + scale.habitat_sq + scale.remoteness_sq, data = umf[[i]]) #multiple linear&quadratic effect
+# c <- as.character(o.mod1@formula)
+# c <- paste0(c[2:3], collapse = " ")
+# dm <- as.character(d.mod@formula)
+# dm <- paste0(dm[2:3], collapse = " ")
 
   
-  # Select best detection model
-  if (d_modsel[[i]]@Full$model[1] == "p(Effort) psi(.) data") {
-    d.mod[[i]] <- d.mod00[[i]]
-  } else {
-    d.mod[[i]] <- d.mod0[[i]]
-  }
-  
- 
   # Create list for modelselection
-  fms[[i]] <-  #modellist_occupancy
-    fitList("p(Effort) psi(.) data" = d.mod[[i]],   #to do!: find best nullmodel for each species
-            "p(.) psi(elevation) data" = o.mod1[[i]],
-            "p(.) psi(habitat) data" = o.mod2[[i]],
-            "p(.) psi(remoteness) data" = o.mod3[[i]],
-            "p(.) psi(elevation + habitat) data" = o.mod4[[i]],
-            "p(.) psi(elevation + remoteness) data" = o.mod5[[i]],
-            "p(.) psi(habitat + remoteness) data" = o.mod6[[i]],
-            "p(.) psi(elevation + habitat + remoteness) data" = o.mod7[[i]]
+  fms <-  #modellist_occupancy
+    fitList("p(Effort) psi(.) data" = d.mod,   #to do!: find best nullmodel for each species
+            "p(Effort) psi(elevation) data" = o.mod1,
+            "p(Effort) psi(habitat) data" = o.mod2,
+            #"p(Effort) psi(distance) data" = o.mod3,
+            "p(Effort) psi(elevation + habitat) data" = o.mod4,
             
-            # "p(Effort) psi(elevation + elevation_sq) data" = o.mod8[[i]],
-            # "p(Effort) psi(habitat + habitat_sq) data" = o.mod9[[i]],
-            # "p(Effort) psi(remoteness + remoteness_sq) data" = o.mod10[[i]],
-            # 
-            # "p(Effort) psi(elevation_sq) data" = o.mod11[[i]],
-            # "p(Effort) psi(habitat_sq) data" = o.mod12[[i]],
-            # "p(Effort) psi(remoteness_sq) data" = o.mod13[[i]],
-            # "p(Effort) psi(elevation_sq + habitat_sq) data" = o.mod14[[i]],
-            # "p(Effort) psi(elevation_sq + remoteness_sq) data" = o.mod15[[i]],
-            # "p(Effort) psi(habitat_sq + remoteness_sq) data" = o.mod16[[i]],
-            # "p(Effort) psi(elevation_sq + habitat_sq + remoteness_sq) data" = o.mod17[[i]],
-            # 
-            # "p(Effort) psi(elevation + habitat + remoteness + elevation_sq + habitat_sq + remoteness_sq) data" = o.mod18[[i]]
+            "p(Effort) psi(elevation + habitat + habitat_sq) data" = o.mod5
+            
+            #"p(Effort) psi(elevation + distance) data" = o.mod5,
+            #"p(Effort) psi(habitat + distance) data" = o.mod6,
+            #"p(Effort) psi(elevation + habitat + distance) data" = o.mod7,
+            #"p(Effort) psi(elevation + habitat + distance + habitat_sq) data" = o.mod8
+            
+            # ,
+            # "p(Effort) psi(remoteness) data" = o.mod9,
+            # "p(Effort) psi(remoteness + distance) data" = o.mod10,
+            # "p(Effort) psi(remoteness + habitat) data" = o.mod11,
+            # "p(Effort) psi(remoteness + elevation) data" = o.mod12,
+            # "p(Effort) psi(remoteness + elevation + habitat + distance) data" = o.mod13,
+            # "p(Effort) psi(remoteness + elevation + habitat + distance + habitat_sq) data" = o.mod14
             )
 
-
-
+  
   # Modelselection
-  modsel[[i]] <- modSel(fms[[i]])
+  (modsel <- modSel(fms))
   
   
   # Convert to df
-  modsel_df[[i]] <- data.frame(model = modsel[[i]]@Full$model,
-                            covariate = gsub("~Effort ~ ", "", modsel[[i]]@Full$formula, ),
-                            nPars = modsel[[i]]@Full$nPars,
-                            AIC=modsel[[i]]@Full$AIC,
-                            delta=modsel[[i]]@Full$delta,
-                            AICwt=modsel[[i]]@Full$AICwt,
-                            cumltvWt=modsel[[i]]@Full$cumltvWt
-                            #p.Effort=modsel[[i]]@Full$`p(Effort)`,
-                            #SEp.Effort=modsel[[i]]@Full$`SEp(Effort)`,
-                            #p.Int=modsel[[i]]@Full$`p(Int)`,
-                            #SEp.Int=modsel[[i]]@Full$`SEp(Int)`,
-                            #psi.Int=modsel[[i]]@Full$`psi(Int)`,
-                            #SEpsi.Int=modsel[[i]]@Full$`SEpsi(Int)`
+  modsel_df <- data.frame(model = modsel@Full$model,
+                               covariate = gsub("~Effort ~ ", "", modsel@Full$formula, ),
+                               nPars = modsel@Full$nPars,
+                               AIC=modsel@Full$AIC,
+                               delta=modsel@Full$delta,
+                               AICwt=modsel@Full$AICwt,
+                               cumltvWt=modsel@Full$cumltvWt
+                               #p.Effort=modsel@Full$`p(Effort)`,
+                               #SEp.Effort=modsel@Full$`SEp(Effort)`,
+                               #p.Int=modsel@Full$`p(Int)`,
+                               #SEp.Int=modsel@Full$`SEp(Int)`,
+                               #psi.Int=modsel@Full$`psi(Int)`,
+                               #SEpsi.Int=modsel@Full$`SEpsi(Int)`
   )
   
   
   # Round dataset
-  modsel_df_round[[i]] <- data.frame(modsel_df[[i]][, c(1,2)], round(modsel_df[[i]][, -c(1,2)], 3))
-
-  # # Plot data
-  # #datatable(modsel_df_round)
-  # print(knitr::kable(modsel_df_round[[i]], row.names = FALSE, caption = paste0("Modelselection ", relevantspecies$species[[i]])))
+  (modsel_df_round <- data.frame(modsel_df[, c(1,2)], round(modsel_df[, -c(1,2)], 3)))
   
-}
-
-warnings() # --> 16 (3??) sites have been discarded because of missing data.
-
-# # assign species names to lists
-# names(fms) <- names(modsel) <- names(modsel_df) <- names(modsel_df_round) <- names(detHist)
-
-# detection modelselection of SBC
-modsel_df_round[43]
-DT::datatable(modsel_df_round[[43]])
+  # Plot data
+  DT::datatable(modsel_df_round)
 
 
-#modsel_df_round_SC_prob50000_pred10 <- modsel_df_round[[43]]
-#modsel_df_round_SC_prob50000_pred200 <- modsel_df_round[[43]]
 
-#modsel_df_round_SC_prob50000_sfd_pred200 <- modsel_df_round[[43]]
-#modsel_df_round_SC_prob50000_sfd_pred10 <- modsel_df_round[[43]]
+# modsel_df_round_SC_prob_eq10000_10_100 <- modsel_df_round[[43]]
+# write.csv(modsel_df_round_SC_prob_eq10000_10_100, 
+#           "D:/Luisa/Rsuperclass/.../modsel_df_round_SC_prob_eq10000_10_100.csv")     
 
-#modsel_df_round_SC_prob50000_comb23_pred200 <- modsel_df_round[[43]]
-#modsel_df_round_SC_prob50000_comb23_pred10 <- modsel_df_round[[43]]
-
-#modsel_df_round_SC_prob50000_fract1_pred200 <- modsel_df_round[[43]]
-#modsel_df_round_SC_prob50000_fract2_pred200 <- modsel_df_round[[43]]
-
-# write.csv(modsel_df_round_SC_prob10000_pred10, 
-#           "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob10000_pred10.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-# write.csv(modsel_df_round_SC_prob50000_pred10,
-#           "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_pred10.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-# write.csv(modsel_df_round_SC_prob50000_pred200,
-#           "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_pred200.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-# write.csv(modsel_df_round_SC_prob50000_sfd_pred200,
-#           "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_sfd_pred200.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-# write.csv(modsel_df_round_SC_prob50000_sfd_pred10,
-#          "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_sfd_pred10.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-# write.csv(modsel_df_round_SC_prob50000_comb23_pred200,
-#          "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_comb23_pred200.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-# write.csv(modsel_df_round_SC_prob50000_comb23_pred10,
-#          "D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_comb23_pred10.csv")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
-
-# comb10 <- read.csv("D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_comb23_pred10.csv") 
-# comb200 <- read.csv("D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_comb23_pred200.csv") 
-# sfd10 <- read.csv("D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_sfd_pred10.csv") 
-# sfd200 <- read.csv("D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_sfd_pred200.csv") 
-# normal200 <- read.csv("D:/Luisa/Rsuperclass/SC_prob_50000/SBC_predictions_200m/modsel_df_round_SC_prob50000_pred200.csv") 
 
 
 
@@ -685,24 +493,28 @@ DT::datatable(modsel_df_round[[43]])
 #### --> save / import R.data ---------------------------------------------------------------------------------------------
 
 # Save whole workspace to working directory (date: 01.09.2022)
-#save.image("C:/Users/s347553/Documents/Masterthesis/Data/occupancy/SBC_occupancy_1.9.RData")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
+#save.image("C:/Users/s347553/Documents/Masterthesis/Data/occupancy/SBC_occupancy_11.11.RData")            ##save.image("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
 
 # Load workspace back to RStudio
-#load("C:/Users/s347553/Documents/Masterthesis/Data/occupancy/SBC_occupancy_1.9.RData")                  ##load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
+#load("C:/Users/s347553/Documents/Masterthesis/Data/occupancy/SBC_occupancy_11.11.RData")                  ##load("D:/Dateien/Uni/Eagle_Master/Masterthesis/R_Masterthesis_SBC/testing/occupancy/SBC_occupancy_1.9.RData")
 
 
 
 
 # ## 5.6 Response Curves ========================================================================================
-# 
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 df_pred <- data.frame(scale.habitat = seq(-2,2, length.out = 100),
                       scale.remoteness = 0)
 x <- predict(o.mod6[[43]], newdata  = df_pred, type = "state")
 new <- cbind(df_pred,x)
 
 plot(new$Predicted ~ new$scale.habitat, ylim=c(0,1), type="l", )
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# ### HIER HÃNGTS NOCH ####
+
+
+# ### HIER HÃNGTS NOCH BISSCHEN ####
 # # an daten im script angepasst, aber plots wollen nicht
 # 
 # 
@@ -711,60 +523,62 @@ plot(new$Predicted ~ new$scale.habitat, ylim=c(0,1), type="l", )
 # #> and 95% confidence intervals (lightgrey).
 # 
 # 
-# # Set path to source code for adapted plotfunction
-# source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/PlotResponseCurves_uni.R"))
+# Set path to source code for adapted plotfunction
+# source(file.path("C:/Users/s347553/Documents/R/PlotResponseCurves_uni.R"))
 # 
-# covplot <- sapply(fms[[43]]@fits[-1], continuous.plot2, modsel = modsel, covariates = covariates_sq %>% select( -matches("scale.")), quiet = TRUE)
-# 
-# 
-# # Set path to source code for adapted plotfunction
-# #source(file.path(wd,"/scripts/PlotResponseCurves_uni.R"))
-# source(file.path("D:/Dateien/Uni/Eagle_Master/Hiwijob_IZW/Screenforbio_Dopbox_backup/scripts/multi-plot_edit_LP.R"))
-# 
-# tmpdir <- tempdir()
-# 
+# covplot <- sapply(fms@fits[-1], continuous.plot, modsel = modsel, covariates = covariates %>% select( -matches("scale.")), quiet = TRUE)
+# print(covplot)
+
+# Set path to source code for adapted plotfunction
+#source(file.path(wd,"/scripts/PlotResponseCurves_uni.R"))
+source("C:/Users/s347553/Documents/R/multi-plot_edit_LP_v2.R")
+
+tmpdir <- tempdir()
+
 # for (i in 43:43){#1:length(unique(detHist))){
 # 
 #   # cat("\n")
 #   # cat("#####", names(detHist)[i], "  \n")
 # 
-#   if (names(fms[[i]]@fits) != "~1 ~ 1")  # original: "~Effort ~ 1"
+#   if (names(fms@fits) != "~Effort ~ 1")  # alternativ: "~1 ~ 1"
 #     #print("true"
-# 
-#     multiplot.wrapper(model.list = fms[[i]]@fits,
-#                               siteCovs_unscaled = covariates %>% select( -matches("scale.")),
-#                               modelRanking = modsel[[i]],
-#                               occasionLength = occasionLength,
-#                               #plotnames.by.rank ,
-#                               plotDir = tmpdir,
-#                               speciesVector = relevantspecies$species[[i]],
-#                               #index_tmp = 1,
-#                               addRug = TRUE,
-#                               #maximumRankToPlot = 200,
-#                               plotModelsBelowNullModel = F,
-#                               quiet = T
-# )
-# 
+
+    multiplot.wrapper(model.list =  fms@fits,
+                      siteCovs_unscaled = covariates %>% select( matches("scale.")), # original: ( -matches("scale."))
+                      modelRanking = modsel,                                         # -> !! geht dann aber nicht !!
+                      occasionLength = occasionLength,
+                      #plotnames.by.rank ,
+                      plotDir = tmpdir,
+                      speciesVector = myspecies, #relevantspecies$species[[i]],
+                      index_tmp = 1,
+                      addRug = TRUE,
+                      #maximumRankToPlot = 200,
+                      plotModelsBelowNullModel = F,
+                      quiet = T
+)
+
+    
+
 # 
 #   else(
-#     #print("nullmodel was bestmodel, so no covariates explain occuence")
-#     multiplot.wrapper(model.list = fms[[i]]@fits[2],
-#                               siteCovs_unscaled = covariates %>% select( -matches("scale.")),
-#                               modelRanking = modsel[[i]],
-#                               occasionLength = occasionLength,
-#                               #plotnames.by.rank ,
-#                               plotDir = tmpdir,
-#                               speciesVector = relevantspecies$species[[i]],
-#                               #index_tmp = 1,
-#                               addRug = TRUE,
-#                               #maximumRankToPlot = 200,
-#                               plotModelsBelowNullModel = F,
-#                               quiet = T
-#     )
-#     )
+#     print("nullmodel was bestmodel, so no covariates explain occuence")
+#     # multiplot.wrapper(model.list = fms@fits[2],
+#     #                           siteCovs_unscaled = covariates %>% select( -matches("scale.")),
+#     #                           modelRanking = modsel,
+#     #                           occasionLength = occasionLength,
+#     #                           #plotnames.by.rank ,
+#     #                           plotDir = tmpdir,
+#     #                           speciesVector = myspecies, #relevantspecies$species[[i]],
+#     #                           #index_tmp = 1,
+#     #                           addRug = TRUE,
+#     #                           #maximumRankToPlot = 200,
+#     #                           plotModelsBelowNullModel = F,
+#     #                           quiet = T
+#     # )
+#     # )
 #     # cat("   \n")
 # }
-# 
+
 
 
 
@@ -864,29 +678,55 @@ remraster_scaled <- (remr_agg - attr(covariates_scaled_matrix, "scaled:center")[
 # head(covariates_scaled_matrix2)
 
 
+### Distance Coast ======================================================================================================
+
+# Import remoteness raster
+#distraster <- raster("D:/Luisa/covariates/Distance_coast/SVN_proximity_utm49n_in_meter.tif")
+
+# Aggregate 30m remoteness raster to 200m resolution to match with other rasters
+#dist_agg <- aggregate(distraster, fact = (200/30), fun = mean, na.rm = TRUE)
+#writeRaster(dist_agg, "D:/Luisa/covariates/Distance_coast/SVN_proximity_utm49n_in_meter_aggr200.tif")
+dist_agg <- raster("D:/Luisa/covariates/Distance_coast/SVN_proximity_utm49n_in_meter_aggr200.tif")
+#remr_agg <- aggregate(remr_agg, fact = (1000/200), fun = mean, na.rm = TRUE)
+
+# Scale elevation raster
+distraster_scaled <- (dist_agg - attr(covariates_scaled_matrix, "scaled:center")[colnames(covariates_scaled_matrix) == "distance"] ) /  attr(covariates_scaled_matrix, "scaled:scale")[colnames(covariates_scaled_matrix) == "distance"]
+
+
+# attr(covariates_scaled_matrix, "scaled:center")
+# attr(covariates_scaled_matrix2, "scaled:center")
+# attr(covariates_scaled_matrix, "scaled:scale")
+# attr(covariates_scaled_matrix2, "scaled:scale")
+# 
+# head(covariates_scaled_matrix)
+# head(covariates_scaled_matrix2)
+
+
 
 # 6.2 Create rasterstack ============================================================================
 
 # rename scaled covariate rasters
 elevr <- elevationraster_scaled
 hab3r <- Hab3raster_scaled
-remr <- remraster_scaled
+#remr <- remraster_scaled
+distr <- distraster_scaled
 
 # resample rasters for raster stack
 #elevr <- resample(elevr, villdensr)
 elevr
 hab3r <- resample(hab3r, elevr)
-remr <- resample(remr, elevr)
+#remr <- resample(remr, elevr)
+distr <- resample(distr, elevr)
 
 # stack rasters
-predstack <- raster::stack(elevr, hab3r, remr)
-names(predstack) <- c("scale.elevation", "scale.habitat", "scale.remoteness")#, "scale.evelvation_sq", "scale.habitat_sq", "scale.remoteness_sq")
+predstack <- raster::stack(elevr, hab3r)#, distr)
+names(predstack) <- c("scale.elevation", "scale.habitat")#, "scale.distance")#, "scale.evelvation_sq", "scale.habitat_sq", "scale.remoteness_sq")
 
 
 # 6.3 Make predictions ---------------------------------------------------------------------------------------
 
 # --> check out SBC bestmodels:     sfd     5,3,6,7,1,4,2
-modsel_df_round[43]
+modsel_df_round
 
 
 # ## --> predict_manual not applicable to multiple covariate models! 
@@ -899,20 +739,21 @@ modsel_df_round[43]
 
 # Either use predict ...
 start_time <- Sys.time()
-prediction_o.mod6 <- predict(o.mod6[[43]], newdata  = predstack, type = "state")
-
-#writeRaster(prediction_o.mod6, "D:/Luisa/Rsuperclass/SC_prob_10m/SBC_predictions_200m/SVN_SBC_pred200_1_mod6_hr.tif")
+prediction_o.mod4 <- predict(o.mod4, newdata  = predstack, type = "state")
 end_time <- Sys.time()
 end_time - start_time
 # --> Time difference 1000 scale of 47.91 secs
-# --> Time difference 200 scale of 10.1 mins / 8.03 mins
+# --> Time difference 200 scale of 10.1 mins / 8.03 mins / 9.8 mins
+writeRaster(prediction_o.mod4, "D:/Luisa/Rsuperclass/SC_prob_10m/SBC_predictions_200m/SVN_SBC_pred200_CTall_ehh2_1_mod4_eh.tif")
 
-prediction_o.mod7 <- predict(o.mod7[[43]], newdata  = predstack, type = "state")
-prediction_o.mod4 <- predict(o.mod4[[43]], newdata  = predstack, type = "state")
-prediction_o.mod5 <- predict(o.mod5[[43]], newdata  = predstack, type = "state")
-prediction_o.mod3 <- predict(o.mod3[[43]], newdata  = predstack, type = "state")
-prediction_o.mod1 <- predict(o.mod1[[43]], newdata  = predstack, type = "state")
-prediction_o.mod2 <- predict(o.mod2[[43]], newdata  = predstack, type = "state")
+
+
+# prediction_o.mod7 <- predict(o.mod7, newdata  = predstack, type = "state")
+# prediction_o.mod4 <- predict(o.mod4, newdata  = predstack, type = "state")
+# prediction_o.mod5 <- predict(o.mod5, newdata  = predstack, type = "state")
+# prediction_o.mod3 <- predict(o.mod3, newdata  = predstack, type = "state")
+# prediction_o.mod1 <- predict(o.mod1, newdata  = predstack, type = "state")
+# prediction_o.mod2 <- predict(o.mod2, newdata  = predstack, type = "state")
 
 
 
