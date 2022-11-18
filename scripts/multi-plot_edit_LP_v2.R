@@ -73,7 +73,8 @@ tmp2 <- data.frame(tmp2[order(tmp2[,1]),])
 names(tmp2) <- names(tmp) <- names(estimates.tmp)[-1]
 
 # extract unscaled covariates
-tmp3 <- data.frame(siteCovs_unscaled[,names(tmp2)])
+# tmp3 <- data.frame(siteCovs_unscaled[, names(tmp2)])
+tmp3 <- data.frame(siteCovs_unscaled[,gsub("scale.", "", names(tmp2))])
 
 # calculate quantiles and add mean (= 0) of unscaled covariates
 tmp3a <- as.data.frame(apply(tmp3, MARGIN = 2, FUN = quantile))
@@ -118,7 +119,7 @@ for(o in 1:ncol(tmp3b)){
   # #  p.val.tmp2 <- p.val.tmp[(o + c(1,4))]   # if there is a quadratic term in the formula, return p-values of linear and quadratic covariate
   #   p.val.tmp2 <- p.val.tmp[o + 4]   # if there is a quadratic term in the formula, return p-values of linear and quadratic covariate
   # } else {
-    p.val.tmp2 <- p.val.tmp[o + 1]  # so wird jede richtig ausgewählt
+    p.val.tmp2 <- p.val.tmp[o + 1]  # so wird jede richtig ausgew?hlt
   # }
 
   # p_val_list[[model_index]][o] <- p.val.tmp2      # this one fails for quadratic terms
@@ -165,7 +166,7 @@ for(o in 1:ncol(tmp3b)){
                 alpha=0.15) +
     # geom_ribbon(aes(ymin=Predicted-SE, ymax=Predicted+SE),
     #             alpha=0.2) +
-    geom_line(size = 1) +
+    geom_line(linewidth = 1) +
     ylim (0,1) +
     theme_bw() +
     theme(plot.title = element_text(size = 7, face="bold"),
